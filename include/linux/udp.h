@@ -43,6 +43,8 @@ struct udp_sock {
 #define udp_portaddr_node	inet.sk.__sk_common.skc_portaddr_node
 	int		 pending;	/* Any pending frames ? */
 	unsigned int	 corkflag;	/* Cork is required */
+	unsigned int	 repair_queue;	/* Configures the recv syscall to read
+                                         * from sendqueue rather than inputqueue. */
 	__u8		 encap_type;	/* Is this an Encapsulation socket? */
 	unsigned char	 no_check6_tx:1,/* Send zero UDP6 checksums on TX? */
 			 no_check6_rx:1,/* Allow zero UDP6 checksums on RX? */

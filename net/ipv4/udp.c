@@ -1827,6 +1827,26 @@ int udp_read_sock(struct sock *sk, read_descriptor_t *desc,
 }
 EXPORT_SYMBOL(udp_read_sock);
 
+static int udp_peek_sndq(struct sock *sk, struct msghdr *msg, int len)
+{
+    int err;
+    struct sk_buff *skb = skb_peek(&sk->sk_write_queue);
+    
+    if (skb == NULL) {
+        printk("@@@@ No sendqueue");
+        return -1;
+    }
+
+    // TODO: Add check for length and possible state of queue being empty
+    printk("@@@@ len: %d", len);
+    printk("@@@@ skb_queue_len(): %d", skb_queue_len(&sk->sk_write_queue));
+    printk("@@@@ skb->len: %d", skb->len);
+    err = skb_copy_datagram_msg(skb, 0, msg, skb->len); // TODO: ensure this captures destination socket address and not just message data
+    if (err < 0) { return err; }
+    printk("@@@@ udp_peek_sndq copied: %d", skb->len);
+    return skb->len;
+}
+
 /*
  * 	This should be easy, if there is something there we
  * 	return it, otherwise we block.
@@ -1842,6 +1862,12 @@ int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
 	int off, err, peeking = flags & MSG_PEEK;
 	int is_udplite = IS_UDPLITE(sk);
 	bool checksum_valid = false;
+    
+    printk("@@@@ udp_recvmsg(), repairQueue is: %d", udp_sk(sk)->repair_queue);
+    if (udp_sk(sk)->repair_queue) {
+        err = udp_peek_sndq(sk, msg, len);
+        return err;
+    }
 
 	if (flags & MSG_ERRQUEUE)
 		return ip_recv_error(sk, msg, len, addr_len);
@@ -2723,6 +2749,15 @@ int udp_lib_setsockopt(struct sock *sk, int level, int optname,
 		release_sock(sk);
 		break;
 
+    case UDP_REPAIR_QUEUE:
+		printk("@@@@ udp_lib_setsockopt(), UDP_REPAIR_QUEUE set to: %d\n", val);
+        if (val != 0) {
+			WRITE_ONCE(up->repair_queue, 1);
+		} else {
+			WRITE_ONCE(up->repair_queue, 0);
+		}
+		break;
+    
 	/*
 	 * 	UDP-Lite's partial checksum coverage (RFC 3828).
 	 */
